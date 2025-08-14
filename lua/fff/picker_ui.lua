@@ -478,14 +478,27 @@ function M.render_list()
   local win_height = vim.api.nvim_win_get_height(M.state.list_win)
   local display_count = math.min(#items, win_height)
   local empty_lines_needed = win_height - display_count
+  local start_idx = M.state.top or 1
 
   for i = 1, empty_lines_needed do
     table.insert(lines, '')
   end
 
-  local end_idx = math.min(#items, display_count)
+  if M.state.cursor < start_idx then
+    start_idx = M.state.cursor
+  elseif M.state.cursor >= start_idx + win_height then
+    start_idx = M.state.cursor - win_height + 1
+  end
+
+  if start_idx + win_height - 1 > #items then start_idx = math.max(1, #items - win_height + 1) end
+
+  M.state.top = start_idx
+
+  local end_idx = math.min(start_idx + display_count - 1, #items)
+  local actual_display_count = end_idx - start_idx + 1
+
   local items_to_show = {}
-  for i = 1, end_idx do
+  for i = start_idx, end_idx do
     table.insert(items_to_show, items[i])
   end
 
@@ -560,7 +573,8 @@ function M.render_list()
 
   if #items > 0 then
     -- cursor=1 means first/best item, which appears at the last line after reversal
-    local cursor_line = empty_lines_needed + (display_count - M.state.cursor + 1)
+    local cursor_offset_in_window = M.state.cursor - start_idx + 1
+    local cursor_line = empty_lines_needed + (actual_display_count - cursor_offset_in_window + 1)
 
     if cursor_line > 0 and cursor_line <= win_height then
       vim.api.nvim_win_set_cursor(M.state.list_win, { cursor_line, 0 })
